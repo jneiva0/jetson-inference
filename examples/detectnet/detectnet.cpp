@@ -29,14 +29,14 @@
 #include <signal.h>
 
 
-bool signal_recieved = false;
+bool signal_received = false;
 
 void sig_handler(int signo)
 {
 	if( signo == SIGINT )
 	{
 		LogVerbose("received SIGINT\n");
-		signal_recieved = true;
+		signal_received = true;
 	}
 }
 
@@ -120,7 +120,7 @@ int main( int argc, char** argv )
 	/*
 	 * processing loop
 	 */
-	while( !signal_recieved )
+	while( !signal_received )
 	{
 		// capture next image
 		uchar3* image = NULL;
