@@ -49,9 +49,9 @@ detectNet::detectNet(float meanPixel) : tensorNet()
 {
 	mTracker = NULL;
 	mMeanPixel = meanPixel;
-	mLineWidth = 3.5f;
+	mLineWidth = 1.3f;
 
-	mCornerRatio = 0.2f;
+	mCornerRatio = 0.15f;
 
 	mNumClasses = 0;
 	mClassColors = NULL;
@@ -985,31 +985,51 @@ bool detectNet::Overlay(void *input, void *output, uint32_t width, uint32_t heig
 	// bounding box lines
 	if (flags & OVERLAY_LINES)
 	{
+
+		const float4 &color = make_float4(237, 228, 234, 170);
+		const float4 &circleColor = make_float4(237, 228, 234, 90);
 		for (uint32_t n = 0; n < numDetections; n++)
 		{
 			const Detection *d = detections + n;
 			// const float4 &color = mClassColors[d->ClassID];
-			const float4 &color = mClassColors[d->ClassID];
-			// #B8B1B6
-			// Calculate corner lengths based on the size of the bounding box
-			const int cornerLengthX = (d->Right - d->Left) * mCornerRatio;
-			const int cornerLengthY = (d->Bottom - d->Top) * mCornerRatio;
+
+			// Calculate corner length based on the minimum of the bounding box's width and height
+			int cornerLength = std::min(d->Right - d->Left, d->Bottom - d->Top) * mCornerRatio;
+
+			// Ensure corner length is at least 2
+			cornerLength = std::max(cornerLength, 2);
 
 			// Top-left corner
-			CUDA(cudaDrawLine(input, output, width, height, format, d->Left, d->Top, d->Left + cornerLengthX, d->Top, color, mLineWidth));
-			CUDA(cudaDrawLine(input, output, width, height, format, d->Left, d->Top, d->Left, d->Top + cornerLengthY, color, mLineWidth));
+			CUDA(cudaDrawLine(input, output, width, height, format, d->Left, d->Top, d->Left + cornerLength, d->Top, color, mLineWidth));
+			CUDA(cudaDrawLine(input, output, width, height, format, d->Left, d->Top, d->Left, d->Top + cornerLength, color, mLineWidth));
 
 			// Top-right corner
-			CUDA(cudaDrawLine(input, output, width, height, format, d->Right, d->Top, d->Right - cornerLengthX, d->Top, color, mLineWidth));
-			CUDA(cudaDrawLine(input, output, width, height, format, d->Right, d->Top, d->Right, d->Top + cornerLengthY, color, mLineWidth));
+			CUDA(cudaDrawLine(input, output, width, height, format, d->Right, d->Top, d->Right - cornerLength, d->Top, color, mLineWidth));
+			CUDA(cudaDrawLine(input, output, width, height, format, d->Right, d->Top, d->Right, d->Top + cornerLength, color, mLineWidth));
 
 			// Bottom-left corner
-			CUDA(cudaDrawLine(input, output, width, height, format, d->Left, d->Bottom, d->Left + cornerLengthX, d->Bottom, color, mLineWidth));
-			CUDA(cudaDrawLine(input, output, width, height, format, d->Left, d->Bottom, d->Left, d->Bottom - cornerLengthY, color, mLineWidth));
+			CUDA(cudaDrawLine(input, output, width, height, format, d->Left, d->Bottom, d->Left + cornerLength, d->Bottom, color, mLineWidth));
+			CUDA(cudaDrawLine(input, output, width, height, format, d->Left, d->Bottom, d->Left, d->Bottom - cornerLength, color, mLineWidth));
 
 			// Bottom-right corner
-			CUDA(cudaDrawLine(input, output, width, height, format, d->Right, d->Bottom, d->Right - cornerLengthX, d->Bottom, color, mLineWidth));
-			CUDA(cudaDrawLine(input, output, width, height, format, d->Right, d->Bottom, d->Right, d->Bottom - cornerLengthY, color, mLineWidth));
+			CUDA(cudaDrawLine(input, output, width, height, format, d->Right, d->Bottom, d->Right - cornerLength, d->Bottom, color, mLineWidth));
+			CUDA(cudaDrawLine(input, output, width, height, format, d->Right, d->Bottom, d->Right, d->Bottom - cornerLength, color, mLineWidth));
+
+			// Calculate the center of the bounding box
+			const float centerX = (d->Right + d->Left) / 2;
+			const float centerY = (d->Bottom + d->Top) / 2;
+			const float crossHairLineWidth = 0.8f;
+
+			// Draw a crosshair at center
+			int crossHairLength = cornerLength * 0.8;
+			CUDA(cudaDrawLine(input, output, width, height, format, centerX - crossHairLength, centerY, centerX + crossHairLength, centerY, color, crossHairLineWidth));
+			CUDA(cudaDrawLine(input, output, width, height, format, centerX, centerY - crossHairLength, centerX, centerY + crossHairLength, color, crossHairLineWidth));
+
+			// Draw the crosshair circle
+			// Calculate the radius of the circle (40% the size of the crosshair lines)
+			const int circleRadius = std::max(crossHairLength * 0.4, 2.0);
+			// Draw a circle at the center of the bounding box
+			CUDA(cudaDrawCircle(input, output, width, height, format, centerX, centerY, circleRadius, circleColor));
 
 			// CUDA(cudaDrawLine(input, output, width, height, format, d->Left, d->Top, d->Right, d->Top, color, mLineWidth));
 			// CUDA(cudaDrawLine(input, output, width, height, format, d->Right, d->Top, d->Right, d->Bottom, color, mLineWidth));
